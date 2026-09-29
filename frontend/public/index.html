@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>dummy1</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <h1>dummy1 <span class="sub">microservices test target</span></h1>
+
+    <section>
+      <h2>Place an order</h2>
+      <div class="row">
+        <select id="sku"></select>
+        <input id="qty" type="number" min="1" value="1">
+        <button id="order-btn">Order</button>
+      </div>
+      <pre id="order-out" class="out"></pre>
+    </section>
+
+    <section>
+      <h2>Look up an order</h2>
+      <div class="row">
+        <input id="order-id" type="number" min="1" placeholder="order id">
+        <button id="lookup-btn">Fetch</button>
+      </div>
+      <pre id="lookup-out" class="out"></pre>
+    </section>
+
+    <section>
+      <h2>Chaos</h2>
+      <div class="row">
+        <button class="chaos" data-path="/slow">/slow</button>
+        <button class="chaos" data-path="/error">/error</button>
+        <span class="chain">
+          <button id="chain-btn">/chain?depth=</button>
+          <input id="depth" type="number" min="1" max="20" value="3">
+        </span>
+      </div>
+      <pre id="chaos-out" class="out"></pre>
+    </section>
+
+    <section>
+      <h2>Request log <button id="clear-btn" class="small">clear</button></h2>
+      <table>
+        <thead>
+          <tr><th>time</th><th>method</th><th>path</th><th>status</th><th>ms</th><th>request id</th></tr>
+        </thead>
+        <tbody id="log"></tbody>
+      </table>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
