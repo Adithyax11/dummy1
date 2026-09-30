@@ -34,5 +34,102 @@ services:
       timeout: 5s
       retries: 10
 
+  inventory-service:
+    build: ./services/inventory-service
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  payment-service:
+    build: ./services/payment-service
+    environment:
+      FAILURE_RATE: ${FAILURE_RATE:-0.1}
+      MIN_LATENCY_MS: ${MIN_LATENCY_MS:-50}
+      MAX_LATENCY_MS: ${MAX_LATENCY_MS:-500}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  order-service:
+    build: ./services/order-service
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      INVENTORY_URL: http://inventory-service:8001
+      PAYMENT_URL: http://payment-service:8002
+      GATEWAY_URL: http://api-gateway:8000
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/%2F
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8003/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  api-gateway:
+    build: ./services/api-gateway
+    environment:
+      ORDER_URL: http://order-service:8003
+      INVENTORY_URL: http://inventory-service:8001
+    ports:
+      # Handy for curl and load tests. Localhost only.
+      - "127.0.0.1:${GATEWAY_PORT:-8000}:8000"
+    depends_on:
+      order-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  notification-worker:
+    build: ./services/notification-worker
+    environment:
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/%2F
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    environment:
+      GATEWAY_URL: http://api-gateway:8000
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+
+  loadgen:
+    build: ./loadgen
+    profiles: ["load"]
+    environment:
+      LOCUST_HOST: http://api-gateway:8000
+    ports:
+      - "127.0.0.1:8089:8089"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+
 volumes:
   pgdata:

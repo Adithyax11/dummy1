@@ -47,3 +47,18 @@ def release_stock(sku: str, quantity: int) -> dict:
 def charge(amount_cents: int) -> dict:
     return _call("payment", f"{settings.payment_url}/charge",
                  {"amount_cents": amount_cents})
+
+def chain(depth: int, request_id: str | None) -> dict:
+    """Call the gateway's /chain (used to bounce a request back and forth)."""
+    headers = {"X-Request-ID": request_id} if request_id else {}
+    try:
+        resp = _client.get(f"{settings.gateway_url}/chain",
+                           params={"depth": depth}, headers=headers)
+    except httpx.TimeoutException as exc:
+        raise UpstreamError("api-gateway", 504, "api-gateway timed out") from exc
+    except httpx.RequestError as exc:
+        raise UpstreamError("api-gateway", 503, "api-gateway unreachable") from exc
+
+    if resp.status_code >= 400:
+        raise UpstreamError("api-gateway", resp.status_code, resp.text)
+    return resp.json()

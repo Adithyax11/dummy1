@@ -1,6 +1,8 @@
 import logging
+import random
+import time
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -84,3 +86,34 @@ def get_order(order_id: int, db: Session = Depends(get_db)):
     if order is None:
         raise HTTPException(status_code=404, detail="order not found")
     return order_to_dict(order)
+
+
+# ---------- test-behavior endpoints ----------
+
+@app.get("/slow")
+def slow(min_ms: int = Query(500, ge=0, le=8000),
+         max_ms: int = Query(3000, ge=0, le=8000)):
+    lo, hi = sorted((min_ms, max_ms))
+    delay = random.randint(lo, hi)
+    time.sleep(delay / 1000)
+    return {"service": "order-service", "slept_ms": delay}
+
+
+@app.get("/error")
+def error(code: int = Query(500, ge=400, le=599)):
+    if code == 500:
+        # Unhandled on purpose: gives a real traceback / exception event
+        raise RuntimeError("simulated failure in order-service")
+    raise HTTPException(status_code=code, detail=f"simulated {code} from order-service")
+
+
+@app.get("/chain")
+def chain(depth: int = Query(3, ge=1, le=20),
+          x_request_id: str | None = Header(None)):
+    if depth <= 1:
+        return {"path": ["order-service"]}
+    try:
+        child = clients.chain(depth - 1, x_request_id)
+    except UpstreamError as err:
+        raise to_http_error(err)
+    return {"path": ["order-service", *child["path"]]}

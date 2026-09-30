@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     http_timeout_s: float = 5.0
     rabbitmq_url: str = "amqp://guest:guest@localhost:5672/%2F"
     order_created_queue: str = "order.created"
+    gateway_url: str = "http://localhost:8000"
 
 
 settings = Settings()
